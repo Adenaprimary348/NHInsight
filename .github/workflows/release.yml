@@ -6,6 +6,7 @@ on:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  DOCKER_IMAGE: cvemula1/nhinsight
 
 permissions:
   contents: write
@@ -54,37 +55,48 @@ jobs:
           context: .
           push: true
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/nhinsight:${{ steps.version.outputs.VERSION }}
-            ${{ secrets.DOCKERHUB_USERNAME }}/nhinsight:latest
+            ${{ env.DOCKER_IMAGE }}:${{ steps.version.outputs.VERSION }}
+            ${{ env.DOCKER_IMAGE }}:latest
           platforms: linux/amd64,linux/arm64
 
       - name: Verify published image
         run: |
-          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/nhinsight:${{ steps.version.outputs.VERSION }}
-          docker run --rm ${{ secrets.DOCKERHUB_USERNAME }}/nhinsight:${{ steps.version.outputs.VERSION }} version
+          docker pull ${{ env.DOCKER_IMAGE }}:${{ steps.version.outputs.VERSION }}
+          docker run --rm ${{ env.DOCKER_IMAGE }}:${{ steps.version.outputs.VERSION }} version
 
-  pypi-publish:
-    name: PyPI Publish
-    needs: test
-    runs-on: ubuntu-latest
-    environment: release
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-      - run: pip install --upgrade pip build twine
-      - name: Build package
-        run: python -m build
-      - name: Publish to PyPI
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-        run: python -m twine upload dist/*
+      - name: Trivy scan
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:latest image \
+            --exit-code 1 \
+            --severity HIGH,CRITICAL \
+            --ignore-unfixed \
+            ${{ env.DOCKER_IMAGE }}:${{ steps.version.outputs.VERSION }}
+
+  # PyPI publish — uncomment PYPI_API_TOKEN secret when ready
+  # pypi-publish:
+  #   name: PyPI Publish
+  #   needs: test
+  #   runs-on: ubuntu-latest
+  #   environment: release
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: actions/setup-python@v5
+  #       with:
+  #         python-version: "3.13"
+  #     - run: pip install --upgrade pip build twine
+  #     - name: Build package
+  #       run: python -m build
+  #     - name: Publish to PyPI
+  #       env:
+  #         TWINE_USERNAME: __token__
+  #         TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+  #       run: python -m twine upload dist/*
 
   github-release:
     name: GitHub Release
-    needs: [docker-publish, pypi-publish]
+    needs: docker-publish
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -98,7 +110,6 @@ jobs:
       - name: Generate changelog
         id: changelog
         run: |
-          # Get commits since last tag
           PREV_TAG=$(git tag --sort=-version:refname | head -2 | tail -1)
           if [ -z "$PREV_TAG" ]; then
             COMMITS=$(git log --oneline --no-decorate)
@@ -119,9 +130,7 @@ jobs:
             ### Install
 
             ```bash
-            pip install nhinsight==${{ steps.version.outputs.VERSION }}
-            # or
-            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/nhinsight:${{ steps.version.outputs.VERSION }}
+            docker pull cvemula1/nhinsight:${{ steps.version.outputs.VERSION }}
             ```
 
             ### Changes
