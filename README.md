@@ -1,8 +1,29 @@
-# NHInsight
+<div align="center">
 
-> You have 10,000 machine identities. Who owns them?
+# 🔍 NHInsight
 
-Open-source CLI that finds **non-human identities** (NHIs) across your cloud — IAM users, service accounts, access keys, deploy keys, service principals — and flags the risky ones before attackers do.
+**Find and fix risky non-human identities across your cloud infrastructure**
+
+*The open-source CLI for NHI discovery, risk analysis, and attack path detection*
+
+[![CI](https://github.com/cvemula1/NHInsight/actions/workflows/ci.yml/badge.svg)](https://github.com/cvemula1/NHInsight/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/pypi/pyversions/nhinsight?logo=python&logoColor=white)](https://pypi.org/project/nhinsight/)
+[![PyPI](https://img.shields.io/pypi/v/nhinsight?color=blue&logo=pypi&logoColor=white)](https://pypi.org/project/nhinsight/)
+[![Docker](https://img.shields.io/docker/v/cvemula1/nhinsight?label=docker&logo=docker&logoColor=white&sort=semver)](https://hub.docker.com/r/cvemula1/nhinsight)
+[![License](https://img.shields.io/github/license/cvemula1/NHInsight?color=green)](LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/cvemula1/NHInsight?style=social)](https://github.com/cvemula1/NHInsight)
+
+[![AWS](https://img.shields.io/badge/AWS-IAM-FF9900?logo=amazonaws&logoColor=white)](#aws)
+[![Azure](https://img.shields.io/badge/Azure-Entra_ID-0078D4?logo=microsoftazure&logoColor=white)](#azure)
+[![GCP](https://img.shields.io/badge/GCP-IAM-4285F4?logo=googlecloud&logoColor=white)](#gcp)
+[![GitHub](https://img.shields.io/badge/GitHub-Org-181717?logo=github&logoColor=white)](#github)
+[![Kubernetes](https://img.shields.io/badge/Kubernetes-RBAC-326CE5?logo=kubernetes&logoColor=white)](#kubernetes)
+
+---
+
+</div>
+
+> 🎨 **We need a logo!** If you're a designer or have ideas, open an issue with the tag `logo` — we'd love your input. See [#1 Logo Discussion](https://github.com/cvemula1/NHInsight/issues/1).
 
 ## The Problem
 
