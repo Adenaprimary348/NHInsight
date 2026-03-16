@@ -4,6 +4,9 @@ on:
   push:
     branches-ignore: [main]
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   quick-check:
     name: Lint & Test
@@ -20,3 +23,19 @@ jobs:
         run: python -m pytest tests/ -q --tb=short
       - name: Demo smoke test
         run: python -m nhinsight.cli demo > /dev/null
+
+  security:
+    name: Trivy Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker image
+        run: docker build -t nhinsight:check-${{ github.sha }} .
+      - name: Run Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: nhinsight:check-${{ github.sha }}
+          format: table
+          exit-code: 1
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
