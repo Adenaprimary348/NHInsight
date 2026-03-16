@@ -1,0 +1,50 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Secrets — never commit
+.env
+*.pem
+*.key
+
+# Ruff / type checkers
+.ruff_cache/
+.mypy_cache/
+
+# Logs
+*.log
+
+# Scan output files (large JSON dumps from real environments)
+scan-*.json
+*.sarif
+
+# Docker
+docker-compose.override.yml
+
+# Internal project context (generated, not source)
+context.md

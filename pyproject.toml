@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nhinsight"
+version = "0.1.0"
+description = "Non-Human Identity discovery for cloud infrastructure"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.9"
+authors = [{name = "cvemula1", email = "cvemula1@users.noreply.github.com"}]
+keywords = ["security", "identity", "nhi", "aws", "gcp", "azure", "kubernetes", "github", "devsecops"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+    "Topic :: System :: Systems Administration",
+]
+dependencies = [
+    "boto3>=1.28",
+]
+
+[project.optional-dependencies]
+azure = ["azure-identity>=1.15", "azure-mgmt-authorization>=4.0"]
+github = ["PyGithub>=2.0"]
+kubernetes = ["kubernetes>=28.0"]
+gcp = ["google-api-python-client>=2.0", "google-auth>=2.0"]
+explain = ["openai>=1.0"]
+all = ["nhinsight[azure,github,kubernetes,gcp,explain]"]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "ruff>=0.1",
+    "moto[iam]>=4.2",
+]
+
+[project.scripts]
+nhinsight = "nhinsight.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/cvemula1/NHInsight"
+Repository = "https://github.com/cvemula1/NHInsight"
+Issues = "https://github.com/cvemula1/NHInsight/issues"
+
+[tool.setuptools.packages.find]
+include = ["nhinsight*"]
+
+[tool.ruff]
+target-version = "py39"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

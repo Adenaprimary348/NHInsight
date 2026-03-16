@@ -1,0 +1,7 @@
+boto3>=1.28
+# Optional — install per provider:
+# pip install nhinsight[gcp]       → google-api-python-client, google-auth
+# pip install nhinsight[github]    → PyGithub
+# pip install nhinsight[kubernetes] → kubernetes
+# pip install nhinsight[explain]   → openai
+# pip install nhinsight[all]       → everything above
