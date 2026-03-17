@@ -24,6 +24,7 @@ Scan a real environment:
 ```bash
 nhinsight scan --aws
 nhinsight scan --all --attack-paths
+nhinsight scan --scan-github-workflows .github/workflows --attack-paths
 ```
 
 Or use Docker:
@@ -57,6 +58,8 @@ docker run --rm chvemula/nhinsight demo
 - Wildcard trust relationships and open role assumptions
 - Dangerous Kubernetes service account bindings (cluster-admin, legacy tokens)
 - Risky GitHub deploy keys, app permissions, and admin-scoped tokens
+- **GitHub Actions CI/CD risks** — OIDC misconfigurations, Managed Identity abuse, self-hosted runner exposure
+- **Cloud resource access from workflows** — Key Vault, ACR, AKS, Storage, SQL, Terraform, Helm, and 40+ resource patterns
 - Cross-cloud attack paths from entry points to privileged resources
 
 **34 risk checks** across 5 providers. [See all risk codes](#risk-codes).
@@ -247,6 +250,7 @@ NHInsight builds an identity graph and traces paths from entry points (keys, tok
 
 ```bash
 nhinsight scan --aws --k8s --gcp --attack-paths
+nhinsight scan --scan-github-workflows .github/workflows --attack-paths
 ```
 
 Example chains NHInsight detects:
@@ -254,6 +258,30 @@ Example chains NHInsight detects:
 - **K8s → AWS** — ServiceAccount → IRSA role → IAM role with AdministratorAccess
 - **K8s → GCP** — ServiceAccount → Workload Identity → SA with roles/owner
 - **GitHub → AWS** — Deploy key → workflow → OIDC → IAM role with S3FullAccess
+- **GitHub Actions → Azure** — Managed Identity → Key Vault secrets, AKS cluster, ACR registry
+- **GitHub Actions → IaC** — Self-hosted runner MI → Terraform apply (infrastructure control)
+- **GitHub Actions → K8s** — MI → AKS credentials → kubectl exec, Helm deployments
+
+### GitHub Actions Workflow Scanning
+
+Scan CI/CD workflows for identity and resource access attack paths:
+
+```bash
+nhinsight scan --scan-github-workflows path/to/.github/workflows --attack-paths
+```
+
+Detects **40+ resource access patterns** across:
+
+| Category | Resources Detected |
+|----------|-------------------|
+| **Azure** | Key Vault, ACR, AKS, Storage, SQL, CosmosDB, DNS, AD, IAM, Functions, Web Apps |
+| **AWS** | S3, Secrets Manager, IAM, EC2, Lambda, ECR, EKS, RDS, DynamoDB, CloudFormation |
+| **GCP** | Compute, GKE, Secret Manager, Cloud SQL, IAM, Cloud Storage |
+| **Kubernetes** | kubectl apply/exec, secret creation, resource mutation |
+| **Deployments** | Helm, Docker push, Terraform/Pulumi apply, Ansible |
+| **External** | Cloudflare DNS/CDN |
+
+Also detects: OIDC permission misconfigurations, PR-trigger cloud auth risks, self-hosted runner Managed Identity exposure, and composite action inlining.
 
 Each path includes:
 - **Blast radius scoring** — 0–100 composite based on privilege level and cross-system reach
@@ -394,6 +422,7 @@ nhinsight scan [OPTIONS]          Discover and analyze NHIs
   --github                        Scan GitHub org
   --k8s                           Scan Kubernetes cluster
   --all                           Scan all available providers
+  --scan-github-workflows PATH    Scan GitHub Actions workflows for CI/CD risks
   --attack-paths                  Run identity attack path analysis
   --format {table,json,sarif}     Output format (default: table)
   --explain                       Add AI-powered explanations
@@ -422,7 +451,7 @@ nhinsight version                 Show version
 git clone https://github.com/cvemula1/NHInsight.git
 cd NHInsight
 pip install -e ".[all,dev]"
-make test     # 151 tests, <1 second
+make test     # 260 tests, <2 seconds
 ```
 
 <details>
@@ -465,7 +494,8 @@ nhinsight/
 │   ├── risk.py                 # Risk analysis (34 checks)
 │   ├── scoring.py              # NIST SP 800-53 + IGA governance scoring
 │   ├── graph.py                # Identity graph model (nodes, edges, BFS)
-│   └── attack_paths.py         # Attack path detection + blast radius
+│   ├── attack_paths.py         # Attack path detection + blast radius
+│   └── workflow_scanner.py     # GitHub Actions CI/CD scanner (40+ resource patterns)
 └── explain/
     └── llm.py                  # Optional LLM explanations (OpenAI)
 ```
