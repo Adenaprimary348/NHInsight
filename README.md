@@ -12,6 +12,10 @@
 
 </div>
 
+## Why NHInsight?
+
+Non-human identities outnumber humans [**80:1**](https://www.cyberark.com/press/machine-identities-outnumber-humans-by-more-than-80-to-1-new-report-exposes-the-exponential-threats-of-fragmented-identity-security/) in most orgs — and growing 44% year-over-year. Enterprise NHI tools charge **$50K+/year**. NHInsight does it for free — open source, runs locally, no telemetry.
+
 ## Quick Start
 
 ```bash
@@ -655,15 +659,12 @@ nhinsight/
 
 ## Roadmap
 
-- [x] **v0.1** — 5 providers, 34 risk checks, attack paths, NIST scoring, SARIF, AI explanations, Docker
+- [x] **v0.1** — 5 providers, 42 risk checks, attack paths, NIST scoring, SARIF, AI explanations, Docker
+- [x] **v0.1.1** — GitHub Actions workflow scanner, 40+ resource access patterns, MI/OIDC attack paths, Mermaid diagrams, CI gating (`--fail-on`), GitHub Action
 - [ ] **v0.2** — OPA/Rego policies, ML classification, anomaly detection, IAM right-sizing
 - [ ] **v0.3** — Slack, Teams, Jira, PagerDuty, webhook integrations
 - [ ] **v0.4** — SIEM export, scheduled scans, drift detection, dashboard API
 - [ ] **v0.5** — Auto-remediation, least-privilege generation, AI agent, PR-based fixes
-
-## Why NHInsight?
-
-Non-human identities outnumber humans **45:1** in most orgs. Enterprise NHI tools charge **$50K+/year**. NHInsight does it for free — open source, runs locally, no telemetry.
 
 ## Contributing
 
