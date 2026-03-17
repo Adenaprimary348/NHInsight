@@ -11,7 +11,8 @@ def test_version():
         capture_output=True, text=True,
     )
     assert result.returncode == 0
-    assert "nhinsight 0.1.0" in result.stdout
+    from nhinsight import __version__
+    assert f"nhinsight {__version__}" in result.stdout
 
 
 def test_demo():
