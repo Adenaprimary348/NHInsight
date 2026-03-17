@@ -32,7 +32,10 @@ CLUSTER_ADMIN_BINDINGS = {
 def analyze_risk(identities: List[Identity], config: NHInsightConfig) -> List[Identity]:
     """Run all risk checks against discovered identities and attach RiskFlags."""
     for ident in identities:
-        ident.risk_flags = []
+        # Preserve risk flags set by upstream scanners (e.g. workflow_scanner)
+        preserved = [f for f in ident.risk_flags
+                     if f.code.startswith("GH_OIDC_") or f.code.startswith("GH_WF_")]
+        ident.risk_flags = preserved
 
         if ident.provider == Provider.AWS:
             _check_aws_risks(ident, config)

@@ -111,6 +111,12 @@ def _build_parser() -> argparse.ArgumentParser:
                                 help="Trace privilege escalation chains across providers (e.g. K8s SA → cloud admin)")
     analysis_group.add_argument("--mermaid", action="store_true",
                                 help="Output attack paths as Mermaid diagrams (implies --attack-paths)")
+    analysis_group.add_argument("--ci-summary", action="store_true",
+                                help="Output a compact markdown summary for CI/PR usage (implies --attack-paths)")
+    analysis_group.add_argument("--github-workflows", metavar="PATH", nargs="?",
+                                const=".github/workflows",
+                                help="Scan GitHub Actions workflow files for OIDC cloud connections "
+                                     "(default path: .github/workflows)")
     analysis_group.add_argument("--stale-days", type=int, default=90, metavar="N",
                                 help="Days without use before flagging as stale (default: 90)")
     analysis_group.add_argument("--explain", action="store_true",
@@ -122,6 +128,8 @@ def _build_parser() -> argparse.ArgumentParser:
                            help="Output format (default: table)")
     out_group.add_argument("--output", "-o", metavar="FILE",
                            help="Write output to file instead of stdout")
+    out_group.add_argument("--ascii", action="store_true",
+                           help="ASCII-safe output (no emoji); auto-enabled in CI environments")
     out_group.add_argument("--verbose", "-v", action="store_true", help="Verbose logging")
 
     # ── demo command ───────────────────────────────────────────────
@@ -139,6 +147,12 @@ def _build_parser() -> argparse.ArgumentParser:
                         help="Include attack path analysis in demo output")
     demo_p.add_argument("--mermaid", action="store_true",
                         help="Output attack paths as Mermaid diagrams (implies --attack-paths)")
+    demo_p.add_argument("--ci-summary", action="store_true",
+                        help="Output a compact markdown summary for CI/PR usage (implies --attack-paths)")
+    demo_p.add_argument("--github-workflows", action="store_true",
+                        help="Include GitHub Actions OIDC demo data in output")
+    demo_p.add_argument("--ascii", action="store_true",
+                        help="ASCII-safe output (no emoji); auto-enabled in CI environments")
 
     # ── report command ─────────────────────────────────────────────
     report_p = sub.add_parser(
@@ -298,6 +312,18 @@ def _run_scan(args: argparse.Namespace) -> None:
         except Exception as e:
             result.errors.append(f"{provider_name}: {e}")
 
+    # GitHub Actions workflow scanning (if requested)
+    wf_path = getattr(args, "github_workflows", None)
+    if wf_path:
+        from nhinsight.analyzers.workflow_scanner import scan_workflows
+        wf_result = scan_workflows(wf_path)
+        if wf_result.identities:
+            all_identities.extend(wf_result.identities)
+        if wf_result.errors:
+            result.errors.extend(wf_result.errors)
+        if wf_result.oidc_connections:
+            result.providers_scanned.append("github-actions")
+
     # Analyze
     classify_identities(all_identities)
     analyze_risk(all_identities, config)
@@ -313,27 +339,49 @@ def _run_scan(args: argparse.Namespace) -> None:
 
     result.identities = all_identities
 
+    # Determine ASCII-safe mode (explicit flag or auto-detect CI)
+    from nhinsight.core.ci_summary import is_ci
+    ascii_safe = getattr(args, "ascii", False) or is_ci()
+
     # Output
     out = sys.stdout
     if args.output:
         out = open(args.output, "w")
 
-    print_result(result, fmt=args.format, out=out)
+    # --ci-summary replaces the normal output with a compact markdown summary
+    wants_ci = getattr(args, "ci_summary", False)
+
+    if not wants_ci:
+        print_result(result, fmt=args.format, out=out, ascii_safe=ascii_safe)
 
     # Attack path analysis (if requested)
-    # --mermaid implies --attack-paths
-    wants_attack = getattr(args, "attack_paths", False) or getattr(args, "mermaid", False)
+    # --mermaid and --ci-summary both imply --attack-paths
+    wants_attack = (
+        getattr(args, "attack_paths", False)
+        or getattr(args, "mermaid", False)
+        or wants_ci
+    )
+    ap_result = None
     if wants_attack and all_identities:
         from nhinsight.analyzers.attack_paths import analyze_attack_paths
         from nhinsight.core.output import print_attack_paths
 
         ap_result = analyze_attack_paths(all_identities)
-        print_attack_paths(ap_result, out=out)
+
+        if not wants_ci:
+            print_attack_paths(ap_result, out=out, ascii_safe=ascii_safe)
 
         if getattr(args, "mermaid", False):
             from nhinsight.core.mermaid import render_attack_paths, render_summary_table
             render_summary_table(ap_result, out=out)
             render_attack_paths(ap_result, out=out)
+
+    # CI summary output (compact markdown for $GITHUB_STEP_SUMMARY / PR comments)
+    if wants_ci:
+        from nhinsight.core.ci_summary import print_ci_summary, write_github_step_summary
+        print_ci_summary(result, ap_result, out=out, ascii_safe=ascii_safe)
+        # Also write to $GITHUB_STEP_SUMMARY if available
+        write_github_step_summary(result, ap_result, ascii_safe=True)
 
     if args.output:
         out.close()
@@ -1022,12 +1070,90 @@ def _build_demo_data() -> ScanResult:
         ),
     ]
 
+    # ── GitHub Actions OIDC demo identities ──────────────────────────
+    oidc_identities = [
+        Identity(
+            id="github:oidc:aws:deploy.yml:arn:aws:iam::123456789012:role/github-deploy-admin",
+            name="OIDC → AWS (Deploy to Prod)",
+            provider=Provider.GITHUB,
+            identity_type=IdentityType.GITHUB_ACTIONS_OIDC,
+            classification=Classification.MACHINE,
+            raw={
+                "workflow_file": "deploy.yml",
+                "workflow_name": "Deploy to Prod",
+                "job_name": "deploy",
+                "cloud_provider": "aws",
+                "role_arn": "arn:aws:iam::123456789012:role/github-deploy-admin",
+                "role_policies": ["AdministratorAccess"],
+                "trigger_events": ["push", "pull_request"],
+                "has_oidc_permission": True,
+            },
+            risk_flags=[
+                RiskFlag(Severity.CRITICAL, "GH_OIDC_ADMIN_ROLE",
+                         "OIDC workflow assumes AWS role with AdministratorAccess",
+                         "Critical: GitHub Actions workflow 'Deploy to Prod' uses OIDC to assume "
+                         "a role with AdministratorAccess. A compromised workflow or malicious PR "
+                         "could gain full AWS account control."),
+                RiskFlag(Severity.HIGH, "GH_OIDC_PR_TRIGGER",
+                         "OIDC cloud auth triggered on pull_request events",
+                         "High: any contributor can trigger this workflow via a PR, "
+                         "obtaining AWS admin credentials. Restrict to push events only."),
+            ],
+        ),
+        Identity(
+            id="github:oidc:azure:infra.yml:11111111-aaaa-bbbb-cccc-000000000001",
+            name="OIDC → Azure (Infra Deploy)",
+            provider=Provider.GITHUB,
+            identity_type=IdentityType.GITHUB_ACTIONS_OIDC,
+            classification=Classification.MACHINE,
+            raw={
+                "workflow_file": "infra.yml",
+                "workflow_name": "Infra Deploy",
+                "job_name": "terraform",
+                "cloud_provider": "azure",
+                "azure_client_id": "11111111-aaaa-bbbb-cccc-000000000001",
+                "azure_tenant_id": "tenant-001",
+                "trigger_events": ["push"],
+                "has_oidc_permission": True,
+            },
+            risk_flags=[
+                RiskFlag(Severity.HIGH, "GH_OIDC_AZURE_CONTRIBUTOR",
+                         "OIDC workflow federates to Azure SP with Contributor at subscription",
+                         "High: workflow 'Infra Deploy' assumes aks-cluster-sp which has "
+                         "Contributor at subscription scope. Scope the SP role to a resource group."),
+            ],
+        ),
+        Identity(
+            id="github:oidc:gcp:ci.yml:ci-runner@my-project.iam.gserviceaccount.com",
+            name="OIDC → GCP (CI Pipeline)",
+            provider=Provider.GITHUB,
+            identity_type=IdentityType.GITHUB_ACTIONS_OIDC,
+            classification=Classification.MACHINE,
+            raw={
+                "workflow_file": "ci.yml",
+                "workflow_name": "CI Pipeline",
+                "job_name": "build-and-push",
+                "cloud_provider": "gcp",
+                "gcp_service_account": "ci-runner@my-project.iam.gserviceaccount.com",
+                "gcp_wif_provider": "projects/123/locations/global/workloadIdentityPools/github/providers/my-repo",
+                "trigger_events": ["push", "pull_request"],
+                "has_oidc_permission": True,
+            },
+            risk_flags=[
+                RiskFlag(Severity.HIGH, "GH_OIDC_PR_TRIGGER",
+                         "OIDC cloud auth triggered on pull_request events",
+                         "High: PR authors can trigger GCP access via Workload Identity "
+                         "Federation. Use environment protection rules or restrict triggers."),
+            ],
+        ),
+    ]
+
     # ── Build combined result ──────────────────────────────────────
     all_ids = (aws_identities + azure_identities + gcp_identities
-               + github_identities + k8s_identities)
+               + github_identities + k8s_identities + oidc_identities)
     return ScanResult(
         identities=all_ids,
-        providers_scanned=["aws", "azure", "gcp", "github", "kubernetes"],
+        providers_scanned=["aws", "azure", "gcp", "github", "kubernetes", "github-actions"],
         scan_time=now,
     )
 
@@ -1237,27 +1363,47 @@ def main():
         result = _build_demo_data()
         fmt = getattr(args, "format", "table")
         output_path = getattr(args, "output", None)
-        if fmt == "table" and not output_path:
-            _print_demo_table(result)
-        else:
-            _output_result(result, fmt, output_path)
-        # Attack path analysis for demo (--attack-paths or --mermaid)
-        wants_attack = getattr(args, "attack_paths", False) or getattr(args, "mermaid", False)
-        if wants_attack:
+        wants_ci = getattr(args, "ci_summary", False)
+
+        # Determine ASCII-safe mode
+        from nhinsight.core.ci_summary import is_ci
+        ascii_safe = getattr(args, "ascii", False) or is_ci()
+
+        if wants_ci:
+            # CI summary mode — compact markdown replaces normal output
             from nhinsight.analyzers.attack_paths import analyze_attack_paths
+            from nhinsight.core.ci_summary import print_ci_summary, write_github_step_summary
             ap_result = analyze_attack_paths(result.identities)
             out = sys.stdout
             if output_path:
-                out = open(output_path, "a")
-            if not getattr(args, "mermaid", False):
-                from nhinsight.core.output import print_attack_paths
-                print_attack_paths(ap_result, out=out)
-            if getattr(args, "mermaid", False):
-                from nhinsight.core.mermaid import render_attack_paths, render_summary_table
-                render_summary_table(ap_result, out=out)
-                render_attack_paths(ap_result, out=out)
+                out = open(output_path, "w")
+            print_ci_summary(result, ap_result, out=out, ascii_safe=ascii_safe)
+            write_github_step_summary(result, ap_result, ascii_safe=True)
             if output_path:
                 out.close()
+                print(f"Results written to {output_path}")
+        else:
+            if fmt == "table" and not output_path:
+                _print_demo_table(result)
+            else:
+                _output_result(result, fmt, output_path)
+            # Attack path analysis for demo (--attack-paths or --mermaid)
+            wants_attack = getattr(args, "attack_paths", False) or getattr(args, "mermaid", False)
+            if wants_attack:
+                from nhinsight.analyzers.attack_paths import analyze_attack_paths
+                ap_result = analyze_attack_paths(result.identities)
+                out = sys.stdout
+                if output_path:
+                    out = open(output_path, "a")
+                if not getattr(args, "mermaid", False):
+                    from nhinsight.core.output import print_attack_paths
+                    print_attack_paths(ap_result, out=out, ascii_safe=ascii_safe)
+                if getattr(args, "mermaid", False):
+                    from nhinsight.core.mermaid import render_attack_paths, render_summary_table
+                    render_summary_table(ap_result, out=out)
+                    render_attack_paths(ap_result, out=out)
+                if output_path:
+                    out.close()
     elif args.command == "graph":
         _run_graph(args)
     elif args.command == "report":

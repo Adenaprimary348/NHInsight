@@ -27,6 +27,7 @@ class IdentityType(str, Enum):
     AZURE_APP_CERT = "azure_app_cert"
     GCP_SERVICE_ACCOUNT = "gcp_service_account"
     GCP_SA_KEY = "gcp_sa_key"
+    GITHUB_ACTIONS_OIDC = "github_actions_oidc"
     UNKNOWN = "unknown"
 
 

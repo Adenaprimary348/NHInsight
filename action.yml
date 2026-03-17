@@ -1,0 +1,68 @@
+name: "NHInsight NHI Scanner"
+description: "Scan non-human identities and GitHub Actions OIDC connections for privilege escalation risks"
+author: "cvemula1"
+
+branding:
+  icon: "shield"
+  color: "red"
+
+inputs:
+  providers:
+    description: "Providers to scan (e.g. --aws --azure). Leave empty for workflow-only scan."
+    required: false
+    default: ""
+  github-workflows:
+    description: "Path to GitHub Actions workflow directory"
+    required: false
+    default: ".github/workflows"
+  attack-paths:
+    description: "Enable attack path analysis"
+    required: false
+    default: "true"
+  format:
+    description: "Output format (table, json, sarif)"
+    required: false
+    default: "table"
+  ascii:
+    description: "Force ASCII-safe output"
+    required: false
+    default: "true"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install NHInsight
+      shell: bash
+      run: pip install nhinsight
+
+    - name: Run NHInsight scan
+      shell: bash
+      env:
+        CI: "true"
+      run: |
+        ARGS="scan"
+
+        # Add provider flags
+        if [ -n "${{ inputs.providers }}" ]; then
+          ARGS="$ARGS ${{ inputs.providers }}"
+        fi
+
+        # Workflow scanning
+        if [ -n "${{ inputs.github-workflows }}" ]; then
+          ARGS="$ARGS --github-workflows ${{ inputs.github-workflows }}"
+        fi
+
+        # Attack paths
+        if [ "${{ inputs.attack-paths }}" = "true" ]; then
+          ARGS="$ARGS --attack-paths"
+        fi
+
+        # CI summary to step summary
+        ARGS="$ARGS --ci-summary"
+
+        # ASCII safe
+        if [ "${{ inputs.ascii }}" = "true" ]; then
+          ARGS="$ARGS --ascii"
+        fi
+
+        nhinsight $ARGS

@@ -250,12 +250,18 @@ def _build_attack_path(
         graph, node_ids, edges, cross_system, blast
     )
 
-    # Build description
+    # Build description — reviewer-friendly wording
     entry_label = steps[0].node_label if steps else "?"
     target_label = steps[-1].node_label if steps else "?"
-    desc = f"{entry_label} → {target_label}"
+    target_node = graph.nodes.get(node_ids[-1])
+    desc = f"{entry_label} can reach {target_label}"
+    if target_node and target_node.is_privileged:
+        meta = target_node.metadata
+        role = meta.get("role_name", "")
+        if role:
+            desc = f"{entry_label} can reach {role} via {target_label}"
     if cross_system:
-        desc += f" (cross-system: {' → '.join(providers)})"
+        desc += f" (crosses {' → '.join(providers)})"
 
     # Recommendation
     rec = _generate_recommendation(graph, node_ids, edges, cross_system)
@@ -416,6 +422,11 @@ EDGE_RECOMMENDATIONS = {
     EdgeType.GCP_WI_MAPS_TO: (
         "Scope the GCP SA to least-privilege. "
         "Use IAM Conditions to restrict to specific K8s namespace/SA."
+    ),
+    EdgeType.OIDC_ASSUMES_ROLE: (
+        "Restrict the OIDC trust policy to specific repos/branches. "
+        "Use sub claim conditions (repo:org/repo:ref:refs/heads/main). "
+        "Replace admin policies with least-privilege scoped to deployment needs."
     ),
 }
 
