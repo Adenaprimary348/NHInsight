@@ -37,36 +37,60 @@ nhinsight scan --github-workflows .github/workflows --attack-paths
 docker run --rm chvemula/nhinsight demo
 ```
 
+### Run in Your CI/CD Pipeline
+
+Add NHInsight to any GitHub Actions workflow — **no cloud credentials needed** for workflow scanning:
+
+```yaml
+# .github/workflows/nhi-scan.yml
+name: NHI Security Scan
+on: [push, pull_request]
+
+jobs:
+  nhi-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cvemula1/NHInsight@main
+        with:
+          attack-paths: "true"       # enable attack path analysis
+          fail-on: "high"            # block PRs with high+ severity findings
+```
+
+The action scans your `.github/workflows` directory, writes findings to the **PR summary**, and fails the check if any identity risk meets the severity threshold. Add cloud provider credentials to also scan live infrastructure:
+
+```yaml
+      - uses: cvemula1/NHInsight@main
+        with:
+          providers: "--aws --azure"
+          attack-paths: "true"
+          fail-on: "critical"
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+```
+
 ### Example: Identity Risk Findings
 
-```
-  🔴 CRITICAL — deploy-bot (iam_user, aws)
-  │  Has AdministratorAccess policy attached
+| Severity | Identity | Provider | Risk |
+|:--------:|----------|:--------:|------|
+| 🔴 **CRITICAL** | `deploy-bot` | AWS | AdministratorAccess policy attached |
+| 🔴 **CRITICAL** | `terraform-deployer` | GCP | Service account has `roles/owner` |
+| 🟠 **HIGH** | `aks-cluster-sp` | Azure | SP has Contributor at subscription scope |
+| 🟡 **MEDIUM** | `ci-runner-mi` | Azure | Self-hosted runner MI accesses Key Vault + AKS + ACR |
+| 🟡 **MEDIUM** | `deploy-sa` | K8s | Bound to `cluster-admin` ClusterRole |
 
-  🔴 CRITICAL — terraform-deployer (gcp_service_account, gcp)
-  │  Service account has roles/owner
+### Example: Attack Paths Detected
 
-  � HIGH — aks-cluster-sp (azure_sp, azure)
-  │  SP has Contributor at subscription scope
-
-  🟡 MEDIUM — ci-runner-mi (managed_identity, azure)
-  │  Self-hosted runner MI accesses Key Vault + AKS + ACR
-```
-
-### Example: Attack Path Detection
-
-```
-  ⚡ CRITICAL  blast=86  github → azure → kubernetes
-  MI → Azure (PR Deploy to Dev) → Key Vault (secret access)
-  → AKS Cluster (get-credentials) → K8s Secret (create)
-  Recommendation: Scope MI to least-privilege. Add environment protection rules.
-
-  ⚡ CRITICAL  blast=83  github → iac
-  MI → Azure (Deploy Infra) → Terraform (infra apply)
-  Recommendation: Restrict runner identity to read-only. Use plan-only in PRs.
-
-  Summary: 31 attack paths across 43 workflows, 222 resource accesses detected
-```
+| Blast | Path | Risk |
+|:-----:|------|------|
+| **86** | `GitHub Actions` → `Managed Identity` → `Key Vault` → `AKS` → `K8s Secrets` | PR trigger can reach production secrets via MI |
+| **83** | `GitHub Actions` → `Managed Identity` → `Terraform Apply` | Self-hosted runner MI can modify infrastructure |
+| **80** | `GitHub Actions` → `OIDC` → `AWS IAM Role` → `S3` + `Secrets Manager` | Workflow assumes admin role via OIDC federation |
+| **75** | `K8s ServiceAccount` → `IRSA` → `IAM Role (AdministratorAccess)` | Pod escape leads to full AWS account access |
 
 ## What It Finds
 
@@ -79,7 +103,7 @@ docker run --rm chvemula/nhinsight demo
 - **Cloud resource access from workflows** — Key Vault, ACR, AKS, Storage, SQL, Terraform, Helm, and 40+ resource patterns
 - Cross-cloud attack paths from entry points to privileged resources
 
-**34 risk checks** across 5 providers. [See all risk codes](#risk-codes).
+**42 risk checks** across 5 providers + CI/CD workflows. [See all risk codes](#risk-codes).
 
 ## Supported Providers
 
@@ -267,7 +291,7 @@ NHInsight builds an identity graph and traces paths from entry points (keys, tok
 
 ```bash
 nhinsight scan --aws --k8s --gcp --attack-paths
-nhinsight scan --scan-github-workflows .github/workflows --attack-paths
+nhinsight scan --github-workflows .github/workflows --attack-paths
 ```
 
 Example chains NHInsight detects:
@@ -363,7 +387,7 @@ flowchart LR
 Scan CI/CD workflows for identity and resource access attack paths:
 
 ```bash
-nhinsight scan --scan-github-workflows path/to/.github/workflows --attack-paths
+nhinsight scan --github-workflows path/to/.github/workflows --attack-paths
 ```
 
 Detects **40+ resource access patterns** across:
@@ -418,7 +442,7 @@ flowchart LR
 ## Risk Codes
 
 <details>
-<summary><b>All 34 risk codes by provider</b></summary>
+<summary><b>All 42 risk codes by provider</b></summary>
 
 ### AWS
 
@@ -426,7 +450,7 @@ flowchart LR
 |------|------|----------|
 | Admin/PowerUser policy attached | `AWS_ADMIN_ACCESS` | Critical |
 | Role trust allows any principal (`*`) | `AWS_WILDCARD_TRUST` | Critical |
-| Access key never rotated (>365 days) | `AWS_KEY_NOT_ROTATED` | High |
+| Access key not rotated (>365 days) | `AWS_KEY_NOT_ROTATED` | High |
 | Console access without MFA | `AWS_NO_MFA` | High |
 | Inactive key not deleted | `AWS_KEY_INACTIVE` | Medium |
 
@@ -434,11 +458,13 @@ flowchart LR
 
 | Risk | Code | Severity |
 |------|------|----------|
-| SP/MI with Owner/Contributor at subscription scope | `AZURE_SP_DANGEROUS_ROLE` | Critical |
+| SP with Owner/Contributor at subscription scope | `AZURE_SP_DANGEROUS_ROLE` | Critical |
+| SP with elevated role at resource group scope | `AZURE_SP_ELEVATED_ROLE` | Medium |
+| Managed Identity with dangerous role at subscription scope | `AZURE_MI_DANGEROUS_ROLE` | High |
 | Disabled SP still has RBAC bindings | `AZURE_SP_DISABLED_WITH_ROLES` | Medium |
 | App credential expired | `AZURE_CRED_EXPIRED` | High |
 | App credential expiring within 30 days | `AZURE_CRED_EXPIRING_SOON` | Medium |
-| Secret not rotated (>365 days) | `AZURE_SECRET_NOT_ROTATED` | High |
+| Client secret not rotated (>365 days) | `AZURE_SECRET_NOT_ROTATED` | High |
 
 ### GCP
 
@@ -451,6 +477,7 @@ flowchart LR
 | SA key not rotated (>365 days) | `GCP_KEY_NOT_ROTATED` | High |
 | SA key expired | `GCP_KEY_EXPIRED` | High |
 | SA key expiring within 30 days | `GCP_KEY_EXPIRING_SOON` | Medium |
+| SA key disabled but not deleted | `GCP_KEY_DISABLED` | Low |
 
 ### Kubernetes
 
@@ -459,15 +486,34 @@ flowchart LR
 | SA bound to cluster-admin | `K8S_CLUSTER_ADMIN` | Critical |
 | Legacy long-lived SA token secret | `K8S_LEGACY_SA_TOKEN` | High |
 | Automount token on privileged SA | `K8S_AUTOMOUNT_PRIVILEGED` | High |
-| Default SA in use / Orphaned SA / No WI | `K8S_*` | Medium |
+| Using default SA in default namespace | `K8S_DEFAULT_SA` | Medium |
+| Orphaned SA (no running pods) | `K8S_ORPHANED_SA` | Medium |
+| SA has secrets but no IRSA/Workload Identity | `K8S_NO_WORKLOAD_IDENTITY` | Medium |
+| Deployments using default SA | `K8S_DEPLOY_DEFAULT_SA` | Medium |
+| Opaque secret contains credential-like keys | `K8S_SECRET_CREDENTIALS` | Medium |
+| TLS secret not managed by cert-manager | `K8S_TLS_UNMANAGED` | Low |
 
 ### GitHub
 
 | Risk | Code | Severity |
 |------|------|----------|
 | Token with admin scope | `GH_ADMIN_SCOPE` | High |
+| Token has full repo access | `GH_REPO_WRITE` | Medium |
 | App with dangerous write perms | `GH_APP_DANGEROUS_PERMS` | High |
 | Deploy key with write access | `GH_DEPLOY_KEY_WRITE` | Medium |
+| Inactive webhook | `GH_WEBHOOK_INACTIVE` | Low |
+
+### GitHub Actions / CI/CD
+
+| Risk | Code | Severity |
+|------|------|----------|
+| OIDC workflow assumes admin-like role | `GH_OIDC_ADMIN_ROLE` | High |
+| Cloud auth triggered on pull_request | `GH_OIDC_PR_TRIGGER` | High |
+| Self-hosted runner uses Managed Identity | `GH_WF_SELF_HOSTED_MI` | High |
+| Workflow missing id-token: write permission | `GH_OIDC_NO_PERMISSION` | Medium |
+| Workflow reads Key Vault secrets | `GH_WF_KEYVAULT_SECRETS` | Medium |
+| Workflow fetches AKS credentials | `GH_WF_AKS_ACCESS` | Medium |
+| OIDC role ARN is a dynamic reference | `GH_OIDC_DYNAMIC_ROLE` | Info |
 
 ### Universal
 
@@ -518,24 +564,31 @@ nhinsight scan [OPTIONS]          Discover and analyze NHIs
   --github                        Scan GitHub org
   --k8s                           Scan Kubernetes cluster
   --all                           Scan all available providers
-  --scan-github-workflows PATH    Scan GitHub Actions workflows for CI/CD risks
-  --attack-paths                  Run identity attack path analysis
-  --format {table,json,sarif}     Output format (default: table)
-  --explain                       Add AI-powered explanations
+  --github-workflows [PATH]       Scan GitHub Actions workflows (default: .github/workflows)
+  --attack-paths                  Trace privilege escalation chains across providers
+  --mermaid                       Output attack paths as Mermaid diagrams
+  --ci-summary                    Compact markdown summary for CI/PR usage
+  --fail-on {critical,high,medium,low}  Exit code 1 if severity threshold met (CI gating)
+  --format, -f {table,json,sarif} Output format (default: table)
+  --output, -o FILE               Write output to file
+  --explain                       Add AI-powered explanations (requires OPENAI_API_KEY)
+  --ascii                         ASCII-safe output (no emoji; auto in CI)
+  --stale-days N                  Days without use before flagging (default: 90)
+  --verbose, -v                   Verbose logging
   --aws-profile PROFILE           AWS named profile
   --aws-region REGION             AWS region
   --azure-tenant-id ID            Azure tenant ID
   --azure-subscription-id ID      Azure subscription ID
   --gcp-project PROJECT           GCP project ID
   --github-org ORG                GitHub organization
+  --github-base-url URL           GitHub Enterprise base URL
   --kubeconfig PATH               Path to kubeconfig
   --kube-context CTX              Kubernetes context
   --kube-namespace NS             Namespace (default: all)
-  --stale-days N                  Days without use before flagging (default: 90)
-  --output FILE                   Write output to file
-  --verbose                       Verbose logging
 
 nhinsight demo                    Show demo scan with sample data
+nhinsight report --demo           Generate formatted markdown report
+nhinsight graph --input FILE      Render Mermaid diagrams from saved JSON
 nhinsight version                 Show version
 ```
 
@@ -577,7 +630,9 @@ nhinsight/
 ├── core/
 │   ├── models.py               # Identity, RiskFlag, ScanResult, enums
 │   ├── config.py               # NHInsightConfig (env vars + CLI flags)
-│   └── output.py               # Table, JSON, SARIF formatters
+│   ├── output.py               # Table, JSON, SARIF formatters
+│   ├── mermaid.py              # Mermaid diagram renderer for attack paths
+│   └── ci_summary.py           # Compact CI/PR markdown summary
 ├── providers/
 │   ├── base.py                 # Abstract BaseProvider interface
 │   ├── aws.py                  # AWS IAM discovery (boto3)
@@ -587,7 +642,7 @@ nhinsight/
 │   └── kubernetes.py           # Kubernetes discovery (kubernetes client)
 ├── analyzers/
 │   ├── classification.py       # Human vs machine classification
-│   ├── risk.py                 # Risk analysis (34 checks)
+│   ├── risk.py                 # Risk analysis (42 checks)
 │   ├── scoring.py              # NIST SP 800-53 + IGA governance scoring
 │   ├── graph.py                # Identity graph model (nodes, edges, BFS)
 │   ├── attack_paths.py         # Attack path detection + blast radius
