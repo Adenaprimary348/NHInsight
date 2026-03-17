@@ -1,0 +1,91 @@
+name: "NHInsight NHI Scanner"
+description: "Scan non-human identities and GitHub Actions OIDC connections for privilege escalation risks"
+author: "cvemula1"
+
+branding:
+  icon: "shield"
+  color: "red"
+
+inputs:
+  version:
+    description: "NHInsight version to install (default: latest)"
+    required: false
+    default: ""
+  providers:
+    description: "Provider flags to scan (e.g. '--aws --azure'). Leave empty for workflow-only scan."
+    required: false
+    default: ""
+  github-workflows:
+    description: "Path to GitHub Actions workflow directory"
+    required: false
+    default: ".github/workflows"
+  attack-paths:
+    description: "Enable attack path analysis"
+    required: false
+    default: "true"
+  fail-on:
+    description: "Fail the step if any identity has this severity or higher (critical, high, medium, low)"
+    required: false
+    default: "high"
+  format:
+    description: "Output format (table, json, sarif)"
+    required: false
+    default: "table"
+  ascii:
+    description: "Force ASCII-safe output"
+    required: false
+    default: "true"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.x"
+
+    - name: Install NHInsight
+      shell: bash
+      run: |
+        if [ -n "${{ inputs.version }}" ]; then
+          pip install "nhinsight==${{ inputs.version }}"
+        else
+          pip install nhinsight
+        fi
+
+    - name: Run NHInsight scan
+      shell: bash
+      env:
+        CI: "true"
+      run: |
+        ARGS="scan"
+
+        # Add provider flags
+        if [ -n "${{ inputs.providers }}" ]; then
+          ARGS="$ARGS ${{ inputs.providers }}"
+        fi
+
+        # Workflow scanning
+        if [ -n "${{ inputs.github-workflows }}" ]; then
+          ARGS="$ARGS --github-workflows ${{ inputs.github-workflows }}"
+        fi
+
+        # Attack paths
+        if [ "${{ inputs.attack-paths }}" = "true" ]; then
+          ARGS="$ARGS --attack-paths"
+        fi
+
+        # CI summary (writes to $GITHUB_STEP_SUMMARY automatically)
+        ARGS="$ARGS --ci-summary"
+
+        # ASCII safe
+        if [ "${{ inputs.ascii }}" = "true" ]; then
+          ARGS="$ARGS --ascii"
+        fi
+
+        # Fail on severity threshold
+        if [ -n "${{ inputs.fail-on }}" ]; then
+          ARGS="$ARGS --fail-on ${{ inputs.fail-on }}"
+        fi
+
+        nhinsight $ARGS

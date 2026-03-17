@@ -18,6 +18,15 @@ BOLD = "\033[1m"
 DIM = "\033[2m"
 RESET = "\033[0m"
 
+# ASCII-safe fallback icons (no emoji, stable in CI logs)
+SEVERITY_ICONS_ASCII = {
+    Severity.CRITICAL: "[CRITICAL]",
+    Severity.HIGH: "[HIGH]",
+    Severity.MEDIUM: "[MEDIUM]",
+    Severity.LOW: "[LOW]",
+    Severity.INFO: "[INFO]",
+}
+
 SEVERITY_COLORS = {
     Severity.CRITICAL: RED,
     Severity.HIGH: RED,
@@ -28,17 +37,17 @@ SEVERITY_COLORS = {
 
 SEVERITY_ICONS = {
     Severity.CRITICAL: "🔴",
-    Severity.HIGH: "�",
+    Severity.HIGH: "🟠",
     Severity.MEDIUM: "🟡",
     Severity.LOW: "🔵",
     Severity.INFO: "🟢",
 }
 
 
-def _print_identity_group(identities, sev, out):
+def _print_identity_group(identities, sev, out, *, ascii_safe=False):
     """Print a group of identities at a given severity level."""
     color = SEVERITY_COLORS[sev]
-    icon = SEVERITY_ICONS[sev]
+    icon = SEVERITY_ICONS_ASCII[sev] if ascii_safe else SEVERITY_ICONS[sev]
     label = sev.value.upper()
     out.write(f"  {color}{icon} {label} ({len(identities)}){RESET}\n")
 
@@ -53,7 +62,7 @@ def _print_identity_group(identities, sev, out):
     out.write("\n")
 
 
-def print_table(result: ScanResult, out: TextIO = sys.stdout) -> None:
+def print_table(result: ScanResult, out: TextIO = sys.stdout, *, ascii_safe: bool = False) -> None:
     """Print scan results as a formatted terminal table."""
     from nhinsight.core.models import Classification
 
@@ -79,7 +88,7 @@ def print_table(result: ScanResult, out: TextIO = sys.stdout) -> None:
     for sev in [Severity.CRITICAL, Severity.HIGH, Severity.MEDIUM, Severity.LOW, Severity.INFO]:
         group = [i for i in nhis if i.highest_severity == sev]
         if group:
-            _print_identity_group(group, sev, out)
+            _print_identity_group(group, sev, out, ascii_safe=ascii_safe)
 
     # Humans in a separate section (if any have risk flags)
     risky_humans = [h for h in humans if h.risk_flags]
@@ -90,7 +99,7 @@ def print_table(result: ScanResult, out: TextIO = sys.stdout) -> None:
         for sev in [Severity.CRITICAL, Severity.HIGH, Severity.MEDIUM, Severity.LOW]:
             group = [h for h in risky_humans if h.highest_severity == sev]
             if group:
-                _print_identity_group(group, sev, out)
+                _print_identity_group(group, sev, out, ascii_safe=ascii_safe)
         if safe_humans:
             out.write(f"  {GREEN}🟢 HEALTHY ({len(safe_humans)}){RESET}\n")
             for h in safe_humans:
@@ -280,7 +289,7 @@ def _md_identity_block(ident, out):
         out.write("- No risk flags\n\n")
 
 
-def print_markdown(result: ScanResult, out: TextIO = sys.stdout) -> None:
+def print_markdown(result: ScanResult, out: TextIO = sys.stdout, *, ascii_safe: bool = False) -> None:
     """Print scan results as a Markdown report."""
     from nhinsight.core.models import Classification
 
@@ -362,7 +371,7 @@ def _get_urgent_fixes(result: ScanResult, limit: int = 5) -> list:
     return [f"**{name}** — {detail}" for _, name, _, detail in urgent[:limit]]
 
 
-def print_attack_paths(ap_result, out: TextIO = sys.stdout) -> None:
+def print_attack_paths(ap_result, out: TextIO = sys.stdout, *, ascii_safe: bool = False) -> None:
     """Print attack path analysis results."""
     paths = ap_result.paths
     stats = ap_result.graph_stats
@@ -393,14 +402,16 @@ def print_attack_paths(ap_result, out: TextIO = sys.stdout) -> None:
     for i, path in enumerate(paths[:15]):
         sev = path.severity
         color = SEVERITY_COLORS.get(sev, RESET)
-        icon = SEVERITY_ICONS.get(sev, "⚪")
+        icons = SEVERITY_ICONS_ASCII if ascii_safe else SEVERITY_ICONS
+        icon = icons.get(sev, "[?]" if ascii_safe else "⚪")
 
         out.write(f"  {color}{icon} {path.id} — {path.description}{RESET}")
         out.write(f"  {BOLD}{sev.value.upper()}{RESET}")
         blast_str = f"  risk: {path.blast_radius:.0f}/100"
         out.write(f"  {DIM}{blast_str}{RESET}")
         if path.cross_system:
-            out.write(f"  {CYAN}⚡ cross-system{RESET}")
+            cross_sym = "(cross-system)" if ascii_safe else "⚡ cross-system"
+            out.write(f"  {CYAN}{cross_sym}{RESET}")
         out.write("\n")
 
         # Steps
@@ -420,7 +431,8 @@ def print_attack_paths(ap_result, out: TextIO = sys.stdout) -> None:
         # Recommendation
         if path.recommendation:
             rec = path.recommendation[:100]
-            out.write(f"  {DIM}  💡 {rec}{RESET}\n")
+            tip = "Tip:" if ascii_safe else "💡"
+            out.write(f"  {DIM}  {tip} {rec}{RESET}\n")
 
         out.write("\n")
 
@@ -431,13 +443,13 @@ def print_attack_paths(ap_result, out: TextIO = sys.stdout) -> None:
     out.write(f"  {'─' * 56}\n\n")
 
 
-def print_result(result: ScanResult, fmt: str = "table", out: TextIO = sys.stdout) -> None:
+def print_result(result: ScanResult, fmt: str = "table", out: TextIO = sys.stdout, *, ascii_safe: bool = False) -> None:
     """Print scan results in the requested format."""
     if fmt == "json":
         print_json(result, out)
     elif fmt == "sarif":
         print_sarif(result, out)
     elif fmt == "markdown" or fmt == "md":
-        print_markdown(result, out)
+        print_markdown(result, out, ascii_safe=ascii_safe)
     else:
-        print_table(result, out)
+        print_table(result, out, ascii_safe=ascii_safe)

@@ -30,6 +30,8 @@ class EdgeType(str, Enum):
     GCP_IAM_BINDING = "gcp_iam_binding"     # GCP SA → IAM role
     GCP_WI_MAPS_TO = "gcp_wi_maps_to"       # K8s SA → GCP SA (GKE WI)
     DEPLOYS_TO = "deploys_to"               # GitHub App → target
+    OIDC_ASSUMES_ROLE = "oidc_assumes_role"  # GH Actions OIDC → cloud role
+    ACCESSES_RESOURCE = "accesses_resource"  # identity → cloud/infra resource
 
 
 @dataclass
@@ -139,6 +141,7 @@ ENTRY_POINT_TYPES = {
     IdentityType.GCP_SA_KEY,
     IdentityType.K8S_SECRET,
     IdentityType.IAM_USER,
+    IdentityType.GITHUB_ACTIONS_OIDC,
 }
 
 
@@ -518,6 +521,184 @@ def build_graph(identities: List[Identity]) -> IdentityGraph:
                     edge_type=EdgeType.GCP_WI_MAPS_TO,
                     label=f"GKE WI → {sa_name}",
                 ))
+
+    # GitHub Actions OIDC → cloud roles (AWS, Azure, GCP)
+    for oidc in by_type.get(IdentityType.GITHUB_ACTIONS_OIDC, []):
+        # AWS OIDC: role_arn in raw
+        role_arn = oidc.raw.get("role_arn", "")
+        if role_arn:
+            target = by_arn.get(role_arn)
+            if target:
+                graph.add_edge(GraphEdge(
+                    source_id=oidc.id,
+                    target_id=target.id,
+                    edge_type=EdgeType.OIDC_ASSUMES_ROLE,
+                    label=f"OIDC → {target.name}",
+                ))
+            else:
+                # Create synthetic AWS IAM role node
+                synth_id = f"aws:iam:role:oidc:{role_arn}"
+                role_name = role_arn.split("/")[-1] if "/" in role_arn else role_arn
+                # Check if role is admin-privileged
+                oidc_policies = oidc.raw.get("role_policies", [])
+                is_priv = any(p in ADMIN_POLICIES for p in oidc_policies)
+                if synth_id not in graph.nodes:
+                    graph.add_node(GraphNode(
+                        id=synth_id,
+                        label=role_name,
+                        node_type="iam_role",
+                        provider="aws",
+                        is_privileged=is_priv,
+                        metadata={"arn": role_arn, "synthetic": True,
+                                  "role_name": role_name,
+                                  "policies": oidc_policies},
+                    ))
+                graph.add_edge(GraphEdge(
+                    source_id=oidc.id,
+                    target_id=synth_id,
+                    edge_type=EdgeType.OIDC_ASSUMES_ROLE,
+                    label=f"OIDC → {role_name}",
+                ))
+                # If the role has known policies, create policy nodes
+                for pol in oidc_policies:
+                    pol_id = f"aws:policy:oidc:{hash(pol) & 0xFFFFFFFF}"
+                    is_admin_pol = pol in ADMIN_POLICIES
+                    if pol_id not in graph.nodes:
+                        graph.add_node(GraphNode(
+                            id=pol_id,
+                            label=pol,
+                            node_type="iam_policy",
+                            provider="aws",
+                            is_privileged=is_admin_pol,
+                            metadata={"policy": pol},
+                        ))
+                    graph.add_edge(GraphEdge(
+                        source_id=synth_id,
+                        target_id=pol_id,
+                        edge_type=EdgeType.HAS_POLICY,
+                        label=f"has {pol}",
+                    ))
+
+        # Azure OIDC: azure_client_id in raw
+        az_client_id = oidc.raw.get("azure_client_id", "")
+        if az_client_id:
+            target = azure_by_appid.get(az_client_id)
+            if target:
+                graph.add_edge(GraphEdge(
+                    source_id=oidc.id,
+                    target_id=target.id,
+                    edge_type=EdgeType.OIDC_ASSUMES_ROLE,
+                    label=f"OIDC → {target.name}",
+                ))
+            else:
+                synth_id = f"azure:sp:oidc:{az_client_id}"
+                if synth_id not in graph.nodes:
+                    graph.add_node(GraphNode(
+                        id=synth_id,
+                        label=f"Azure SP ({az_client_id[:8]}...)",
+                        node_type="azure_sp",
+                        provider="azure",
+                        metadata={"client_id": az_client_id, "synthetic": True},
+                    ))
+                graph.add_edge(GraphEdge(
+                    source_id=oidc.id,
+                    target_id=synth_id,
+                    edge_type=EdgeType.OIDC_ASSUMES_ROLE,
+                    label="OIDC → Azure SP",
+                ))
+
+        # GCP OIDC: gcp_service_account in raw
+        gcp_sa = oidc.raw.get("gcp_service_account", "")
+        if gcp_sa:
+            target = gcp_sa_by_email.get(gcp_sa)
+            if target:
+                graph.add_edge(GraphEdge(
+                    source_id=oidc.id,
+                    target_id=target.id,
+                    edge_type=EdgeType.OIDC_ASSUMES_ROLE,
+                    label=f"OIDC → {target.name}",
+                ))
+            else:
+                synth_id = f"gcp:sa:oidc:{gcp_sa}"
+                sa_name = gcp_sa.split("@")[0] if "@" in gcp_sa else gcp_sa
+                if synth_id not in graph.nodes:
+                    graph.add_node(GraphNode(
+                        id=synth_id,
+                        label=sa_name,
+                        node_type="gcp_service_account",
+                        provider="gcp",
+                        metadata={"email": gcp_sa, "synthetic": True},
+                    ))
+                graph.add_edge(GraphEdge(
+                    source_id=oidc.id,
+                    target_id=synth_id,
+                    edge_type=EdgeType.OIDC_ASSUMES_ROLE,
+                    label=f"OIDC → {sa_name}",
+                ))
+
+    # GitHub Actions / OIDC identities → cloud resource access
+    # Creates synthetic resource nodes for every detected cloud/infra resource
+    _PRIVILEGED_RESOURCE_TYPES = {
+        "azure_keyvault", "azure_aks", "azure_sql", "azure_cosmosdb",
+        "azure_ad", "azure_iam", "azure_storage", "azure_dns",
+        "aws_secrets", "aws_iam", "aws_s3", "aws_eks", "aws_rds",
+        "gcp_secrets", "gcp_gke", "gcp_iam", "gcp_sql",
+        "k8s_secret", "terraform", "pulumi",
+    }
+    _RESOURCE_PROVIDER_MAP = {
+        "azure_": "azure", "aws_": "aws", "gcp_": "gcp",
+        "k8s": "kubernetes", "helm": "kubernetes",
+        "terraform": "iac", "pulumi": "iac", "ansible": "iac",
+        "container_": "docker", "cloudflare": "cloudflare",
+    }
+
+    for oidc in by_type.get(IdentityType.GITHUB_ACTIONS_OIDC, []):
+        cloud_resources = oidc.raw.get("cloud_resources", [])
+        if not cloud_resources:
+            continue
+
+        for res in cloud_resources:
+            rtype = res.get("resource_type", "") if isinstance(res, dict) else getattr(res, "resource_type", "")
+            action = res.get("action", "") if isinstance(res, dict) else getattr(res, "action", "")
+            rname = res.get("resource_name", "") if isinstance(res, dict) else getattr(res, "resource_name", "")
+            severity = res.get("severity", "high") if isinstance(res, dict) else getattr(res, "severity", "high")
+
+            if not rtype:
+                continue
+
+            # Determine provider for the resource node
+            res_provider = "cloud"
+            for prefix, prov in _RESOURCE_PROVIDER_MAP.items():
+                if rtype.startswith(prefix):
+                    res_provider = prov
+                    break
+
+            # Build a unique node ID for deduplication
+            res_id = f"resource:{rtype}:{rname}" if rname else f"resource:{rtype}"
+            label = f"{rname} ({action})" if rname else f"{rtype.replace('_', ' ').title()} ({action})"
+            is_priv = rtype in _PRIVILEGED_RESOURCE_TYPES or severity == "critical"
+
+            if res_id not in graph.nodes:
+                graph.add_node(GraphNode(
+                    id=res_id,
+                    label=label,
+                    node_type=rtype,
+                    provider=res_provider,
+                    is_privileged=is_priv,
+                    metadata={
+                        "resource_type": rtype,
+                        "action": action,
+                        "resource_name": rname,
+                        "severity": severity,
+                        "synthetic": True,
+                    },
+                ))
+            graph.add_edge(GraphEdge(
+                source_id=oidc.id,
+                target_id=res_id,
+                edge_type=EdgeType.ACCESSES_RESOURCE,
+                label=f"{oidc.raw.get('auth_method', 'auth')} → {label}",
+            ))
 
     logger.info(
         "Built identity graph: %d nodes, %d edges, "
